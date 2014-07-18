@@ -16,15 +16,10 @@ package com.findly.common.jms;
  * permissions and limitations under the License.
  */
 
-import java.util.Properties;
-
 import javax.jms.Connection;
-import javax.jms.ConnectionFactory;
 import javax.jms.JMSException;
 import javax.jms.Queue;
-import javax.jms.QueueConnection;
 import javax.jms.QueueConnectionFactory;
-import javax.naming.Context;
 import javax.naming.InitialContext;
 import javax.naming.NamingException;
 
@@ -36,11 +31,11 @@ import org.slf4j.LoggerFactory;
  * @author Dhafir Moussa
  * 
  */
-public enum JmsHelper {
+public class JmsHelper {
 	
-	INSATNCE;
+	public static final JmsHelper INSATNCE = new JmsHelper();
 
-	//protected static final Logger log = LoggerFactory.getLogger(JmsHelper.class);
+	protected static final Logger log = LoggerFactory.getLogger(JmsHelper.class);
 	
 	private InitialContext ctx;
 	private QueueConnectionFactory connectionFactory;
@@ -51,8 +46,8 @@ public enum JmsHelper {
 	
 	
 	
-	public QueueConnection createQueueConnection() throws JMSException{
-		return connectionFactory.createQueueConnection();
+	public Connection createConnection() throws JMSException{
+		return connectionFactory.createConnection();
 	}
 	
 	public Queue getQueue(String queueName) throws JMSException, NamingException{
@@ -62,8 +57,14 @@ public enum JmsHelper {
 	}
 	
 	private void initContext()  {
-	
-		Properties props = new Properties();
+	 
+		try {
+			Class connClass = Class.forName("javax.jms.ConnectionFactory");
+			System.out.println(connClass);
+		} catch (ClassNotFoundException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
 //		props.put(Context.INITIAL_CONTEXT_FACTORY,	"org.jnp.interfaces.NamingContextFactory");
 //		props.put(Context.URL_PKG_PREFIXES," org.jboss.naming:org.jnp.interfaces");
 //		props.put(Context.PROVIDER_URL, "jnp://localhost:1099");
@@ -72,10 +73,13 @@ public enum JmsHelper {
 			ctx =  new InitialContext();
 	//		log.info("InitialContext created.");
 		//	log.info("Creating Queue Connection Factory.");
-			 Object conn = ctx.lookup("/ConnectionFactory");
+			 Object conn = ctx.lookup("java:/ConnectionFactory");
+			 for(Object classObj: conn.getClass().getInterfaces()){
+				 System.out.println(classObj);
+			 }
 			 connectionFactory = (QueueConnectionFactory)conn; 
 			//log.info("Queue Connection Factory created.");
-		} catch (NamingException e) {
+		} catch (Exception e) {
 			//log.error("Failed to create an InitialContext  ", e);
 			e.printStackTrace();
 		}				
@@ -97,7 +101,7 @@ public enum JmsHelper {
 
 	public static final void main(String[] args)  {
 		try {
-			QueueConnection conn = JmsHelper.INSATNCE.createQueueConnection();
+			Connection conn = JmsHelper.INSATNCE.createConnection();
 		} catch (JMSException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();

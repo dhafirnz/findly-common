@@ -7,32 +7,30 @@ package com.findly.common;
  * @author Dhafir Moussa
  *
  */
-import java.util.Enumeration;
-
-import javax.naming.InitialContext;
-
-import javax.naming.NamingException;
+import javax.jms.Connection;
+import javax.jms.ExceptionListener;
+import javax.jms.JMSException;
+import javax.jms.Message;
+import javax.jms.MessageConsumer;
+import javax.jms.MessageListener;
+import javax.jms.MessageProducer;
 import javax.jms.Queue;
 import javax.jms.Session;
-import javax.jms.Message;
-import javax.jms.MapMessage;
 import javax.jms.TextMessage;
-import javax.jms.MessageListener;
-import javax.jms.JMSException;
-import javax.jms.ExceptionListener;
-import javax.jms.QueueSender;
-import javax.jms.QueueSession;
-import javax.jms.QueueReceiver;
-import javax.jms.QueueConnection;
-import javax.jms.QueueConnectionFactory;
+import javax.naming.NamingException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.findly.common.jms.JmsHelper;
 
-public class JmsAssessmentConsumer implements MessageListener,
+public class JmsAssessmentConsumer implements MessageListener, Runnable,
 		ExceptionListener {
-	private QueueSession _session;
+	private static final Logger log = LoggerFactory
+			.getLogger(JmsAssessmentConsumer.class);
+	private Session _session;
 
-	public final static void main(String[] args){
+	public final static void main(String[] args) {
 		try {
 			new JmsAssessmentConsumer();
 		} catch (JMSException e) {
@@ -43,34 +41,39 @@ public class JmsAssessmentConsumer implements MessageListener,
 			e.printStackTrace();
 		}
 	}
+
 	public JmsAssessmentConsumer() throws JMSException, NamingException {
 
-		waitForever();
+		new Thread(this).start();
 	}
 
-	private void init() throws JMSException, NamingException {
-		// get the initial context
-		QueueConnection queueConn = JmsHelper.INSATNCE.createQueueConnection();
-		Queue queue = JmsHelper.INSATNCE.getQueue("queue/testQueue");
-		// create a queue session
-		_session = queueConn.createQueueSession(false,
-				Session.DUPS_OK_ACKNOWLEDGE);
+	private void init() {
+		try {
+			// get the initial context
+			Connection queueConn = JmsHelper.INSATNCE.createConnection();
+			Queue queue = JmsHelper.INSATNCE.getQueue("queue/testQueue");
+			// create a queue session
+			_session = queueConn.createSession(false,
+					Session.DUPS_OK_ACKNOWLEDGE);
 
-		queueConn.start();
+			queueConn.start();
 
-		// create a queue receiver
-		QueueReceiver queueReceiver = _session.createReceiver(queue);
+			// create a queue receiver
+			MessageConsumer queueReceiver = _session.createConsumer(queue);
 
-		// set an asynchronous message listener
-		queueReceiver.setMessageListener(this);
+			// set an asynchronous message listener
+			queueReceiver.setMessageListener(this);
 
-		// set an asynchronous exception listener on the connection
-		queueConn.setExceptionListener(this);
+			// set an asynchronous exception listener on the connection
+			queueConn.setExceptionListener(this);
 
-		// start the connection
-		queueConn.start();
+			// start the connection
+			queueConn.start();
 
-		System.out.println("server listening on " + queue);
+			System.out.println("server listening on " + queue);
+		} catch (Exception e) {
+			log(e.getMessage());
+		}
 	}
 
 	/**
@@ -81,6 +84,7 @@ public class JmsAssessmentConsumer implements MessageListener,
 	 * @param message
 	 *            A JMS message.
 	 */
+
 	public void onMessage(Message message) {
 		try {
 
@@ -88,8 +92,10 @@ public class JmsAssessmentConsumer implements MessageListener,
 			String result = "We received " + txtMsg;
 			TextMessage tm = _session.createTextMessage(result);
 			Queue reply = (Queue) message.getJMSReplyTo();
-			QueueSender sender = _session.createSender(reply);
-			sender.send(tm);
+			if (reply != null) {
+				MessageProducer sender = _session.createProducer(reply);
+				sender.send(tm);
+			}
 		} catch (JMSException ex) {
 			onException(ex);
 		}
@@ -107,14 +113,12 @@ public class JmsAssessmentConsumer implements MessageListener,
 		System.err.println("something bad happended: " + exception);
 	}
 
-	// Handy utility to signal that I'm done
-	synchronized void waitForever() throws JMSException, NamingException {
+	@Override
+	public void run() {
 		init();
-		while (true) {
-			try {
-				wait();
-			} catch (InterruptedException ex) {
-			}
-		}
+	}
+
+	private void log(String msg) {
+		log.info(msg);
 	}
 }
